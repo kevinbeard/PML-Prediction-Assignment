@@ -1,0 +1,102 @@
+---
+title: "Practical Machine Learning Prediction Project"
+author: "Kevin Beard"
+date: "Saturday, December 20, 2014"
+output: html_document
+---
+
+### Introduction
+
+The proliferation of wearable exercise data collectors has created an abundance of potentially useful data. The goal of this project is to build a classification model that moves beyond deciding "what" excerise is being performed and into ascertaining  the "quality" of its performance for efficiency and safety.  
+
+### Data
+
+The data was provided by Groupware@LES [1] as part of the Coursera Practical Machine Learning course. The dataset consisted of 19622 records with 160 variables.
+
+
+```{r}
+pmltr<-read.csv("pml-training.csv")
+
+```
+
+Basic analysis of the data ( structure, summaries, missing data) was performed to look for logical ways to pare down the number of variables from 160. This led to removing any column (variables) with missing data (NAs), summary variables ( kurtosis, skewness, min, max, amplitude), identifier and timestamp variables. These dd not provided data applicable for prediction.
+
+
+```{r}
+#remove NA columns
+nacol<- which(sapply(pmltr,function(x)any(is.na(x))))
+pmltrnona<-pmltr[, -c(nacol)]
+
+# remove identifiers, kurtosis, skewness, etc
+pnames<- names(pmltrnona)
+
+othcol<-1:7
+kcol<-which(grepl("kurtosis_", pnames))
+skcol<-which(grepl("skewness_", pnames))
+mincol<-which(grepl("min_", pnames))
+maxcol<-which(grepl("max_", pnames))
+ampcol<-which(grepl("amplitude_", pnames))
+
+pmltrclean<-pmltrnona[,-c(othcol,kcol,skcol, mincol, maxcol, ampcol)]
+
+
+```
+
+The dataset was pared down to a manageable 52 variables.  Inspection revealed that the remaining columns were the same thirteen variables from the four different sensors (arm, wrist, belt, and dumbell).
+
+Initially we felt it necessary to further reduce the amount of variables especially potential confounders
+before proceeding with classification modeling.  There was an attempt to select influential variables with visuals (box plots by activity and histograms) and summary statistics comparisons(Min, Max, Median values, etc) as well as interaction between variable (correlations). This did provide a fair amount of interesting graphical and numerical features. While it wasn't enough to confidently or substantially pare down the initial data set this process provided insight as to how the "classification tree" models are created. 
+
+The final, cleaned traing set had 53 variables (including classe) and 19622 records. There were no missing data values.
+
+### Model Selection
+
+Due to the size of the training set it was prudent to pull a small sample ( 1000 records, with 52 predictors) and create several different classification models using basic classicfication trees and random forest methods. On this sample the random forest method yielded a much better accuracy rate so I decided to use this method going foward.
+
+The final random forest model was created using a random 70% of the available training set with the remainder (~ 30%) of the training set resvered for cross validation.  The random forest method was run without preprocessing of the data and using all call defaults.
+
+This greedy algorithm method finds a best splitting attribute (node) for the tree at the time which
+creates "purest", or optimal, split. Potential attributes for nodes or splits are evaluated based on
+the information gain, or greatest entropy reduction they create. Entropy measures the amount of
+disorder or uncertainty in a system. In the classification setting, higher entropy (i.e., more
+disorder) corresponds to a sample that has a mixed collection of labels. Lower entropy
+corresponds to a case where we have mostly pure partitions.[2] Basically, if two attributes are
+equally accurate in their splitting, the one with the most orderly postsplit
+results will be selected for the node. This is a recursive process, continuing until no further information gain is obtained or optimal level of purity has been reached.
+
+
+```{r}
+
+library(caret)
+library(randomForest)
+
+set.seed(1967)
+inTrain <- createDataPartition(y=pmltrclean$classe, p=0.7, list=FALSE)
+training <- pmltrclean[inTrain,]
+testing <- pmltrclean[-inTrain,]
+
+
+classe.rf <- randomForest(classe ~ ., data=training)
+classe.rf
+```
+
+The final model created had an OOB esimated error rate of .58%, or an accuracy rate of 99.42%.  This was cross validated with the reserved ~30% of the training set.
+
+```{r}
+predtest <-predict(classe.rf, newdata=testing)
+confusionMatrix(predtest, testing$classe)
+
+```
+
+The estimated out of sample error rate is .53% ( accuracy rate of 99.47%) with the reserved data.  This confirmed the estimated accuracy of the model. 
+
+### Results
+The final model was used to predict the classe of the 20 different test cases provided with 100% accuracy.
+
+### Conclusion
+This method proves to be highly accurate in predicting "how well" this single exercise is being performened.  While it may be transferable to other exercises, it required a significent effort on up-front data collection and participant specific calibration.  It is doubtful that this method would provide the real-time feedback neccessary to provide increased form and safety by its participants. 
+
+### References
+[1]Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. http://groupware.les.inf.puc-rio.br/har
+
+[2] Data Mining Alogrithms in R, WikBook, http://en.wikibooks.org/wiki/ Data_Mining_Algorithms_In_R/Classification/Decision_Trees, Accessed 12/10/2014
