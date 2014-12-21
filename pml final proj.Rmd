@@ -1,0 +1,52 @@
+---
+title: "PML Project"
+author: "Kevin Beard"
+date: "Saturday, December 20, 2014"
+output: html_document
+---
+
+read in the training data and load the caret package for 
+
+```{r}
+
+library(caret)
+pmltr<-read.csv("pml-training.csv")
+```
+
+Did some basic analysis of the date to look for logical ways to pare down the number of variables from 159. Removed any column that contained an NA.  Removed any summary variables ( kurtosis, skewness, min, max, amplitude) and any identifier and timestamp variables.
+
+
+```{r}
+#remove NA columns
+nacol<- which(sapply(pmltr,function(x)any(is.na(x))))
+pmltrnona<-pmltr[, -c(nacol)]
+
+# remove kurtosis, skewness
+pnames<- names(pmltrnona)
+
+kcol<-which(grepl("kurtosis_", pnames))
+skcol<-which(grepl("skewness_", pnames))
+mincol<-which(grepl("min_", pnames))
+maxcol<-which(grepl("max_", pnames))
+ampcol<-which(grepl("amplitude_", pnames))
+othcol<-1:7
+pmltrclean<-pmltrnona[,-c(othcol,kcol,skcol, mincol, maxcol, ampcol)]
+
+
+```
+
+Now dataset pared to a manageable 52 variables.  Inspection revealed that the remaining variable wer the the same thirteen variable from the four different sensors (arem, wrist, belt, and dumbell). .
+
+Tried to do some additional variable reduction/selection by looking at various plots and correlations.  Too much to sift through.  Decided to pull a small sample ( 1000 records, with 52 predictors) and create a classification tree as well as a random forest classifier.  While the random forest took a subtantially longer time to run the accuracy rate was much higher.  I decided to use the random forest method (caret package), without preprocessing, running using all call defaults. No cross validation was required due to using random forest. 
+
+
+```{r}
+# Note this code is commented out since it takes so long to run
+
+# modFitrf <- train(classe~ .,data=pmltrclean, method="rf", prox=TRUE, importance=TRUE)
+modFitrf
+```
+
+The random forest classifier generated show an accuracy rate of 99.3% ( out of sample error .7%).
+
+While this method did take a long time to run (several hours), it did prove to be quite accurate.  The model ws accurate on all twenty of the test cases. 
